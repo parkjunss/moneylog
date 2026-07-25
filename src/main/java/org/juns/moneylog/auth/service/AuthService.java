@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.juns.moneylog.auth.dto.AuthTokenResponse;
 import org.juns.moneylog.auth.dto.LoginRequest;
 import org.juns.moneylog.auth.dto.RotatedToken;
+import org.juns.moneylog.config.exception.AuthenticationFailedException;
 import org.juns.moneylog.config.security.JwtTokenizer;
 import org.juns.moneylog.user.domain.User;
 import org.juns.moneylog.user.repository.UserRepository;
@@ -43,7 +44,8 @@ public class AuthService {
             String email,
             String rawPassword
     ) {
-        User user = userRepository.findByEmail(email).orElseThrow(() -> new IllegalArgumentException("Invalid email"));
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AuthenticationFailedException("이메일 또는 비밀번호가 올바르지 않습니다."));
 
         if (!user.isEnabled()
                 || user.getPasswordHash() == null
@@ -51,7 +53,7 @@ public class AuthService {
                 rawPassword,
                 user.getPasswordHash()
         )) {
-            throw new IllegalArgumentException("Invalid email");
+            throw new AuthenticationFailedException("이메일 또는 비밀번호가 올바르지 않습니다.");
         }
 
         return user;
