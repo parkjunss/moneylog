@@ -1,22 +1,22 @@
 package org.juns.moneylog.moneylog.controller;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
-import org.juns.moneylog.moneylog.domain.MoneyLog;
+import org.juns.moneylog.config.enums.CategoryType;
 import org.juns.moneylog.moneylog.dto.MoneyLogRequest;
 import org.juns.moneylog.moneylog.dto.MoneyLogResponse;
 import org.juns.moneylog.moneylog.dto.MoneylogUpdateRequest;
 import org.juns.moneylog.moneylog.dto.MonthlyStatisticsResponse;
 import org.juns.moneylog.moneylog.service.MoneyLogService;
-import org.juns.moneylog.user.domain.User;
-import org.juns.moneylog.user.repository.UserRepository;
-import org.juns.moneylog.user.service.UserService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/money-logs")
@@ -25,9 +25,18 @@ public class MoneyLogController {
     private final MoneyLogService moneyLogService;
 
     @GetMapping
-    public ResponseEntity<List<MoneyLogResponse>> getAllMoneyLog(Authentication authentication) {
+    public ResponseEntity<Page<MoneyLogResponse>> getAllMoneyLog(
+            Authentication authentication,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) @Min(1) @Max(12) Integer month,
+            @RequestParam(required = false) CategoryType type,
+            @RequestParam(required = false) Long categoryId,
+            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+    ) {
         String email = authentication.getName();
-        return ResponseEntity.ok(moneyLogService.getAllLogs(email));
+        return ResponseEntity.ok(
+                moneyLogService.getMoneyLogs(email, year, month, type, categoryId, pageable)
+        );
     }
 
     @PostMapping
