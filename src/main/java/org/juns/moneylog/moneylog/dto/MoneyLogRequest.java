@@ -19,6 +19,9 @@ public record MoneyLogRequest(
         String date,
 
         @NotBlank
-        String category
+        String category,
+
+        @NotBlank
+        String type
 ) {
 }

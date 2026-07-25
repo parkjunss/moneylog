@@ -14,8 +14,11 @@ public record MoneylogUpdateRequest(
         @NotNull
         @Positive
         Long money,
+        @NotBlank
         String date,
         @NotBlank
-        String category
+        String category,
+        @NotBlank
+        String type
 ) {
 }

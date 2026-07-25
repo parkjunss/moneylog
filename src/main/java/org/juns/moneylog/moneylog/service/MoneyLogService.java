@@ -18,11 +18,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.net.http.HttpResponse;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.Month;
-import java.time.Year;
 import java.time.YearMonth;
+import java.time.format.DateTimeParseException;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -49,11 +48,34 @@ public class MoneyLogService {
                 .description(moneyLogRequest.description())
                 .money(moneyLogRequest.money())
                 .category(category)
-                .type(category.getType())
+                .type(parseType(moneyLogRequest.type()))
+                .createdAt(parseDate(moneyLogRequest.date()))
                 .build();
         moneyLogRepository.save(moneyLog);
 
         return MoneyLogResponse.from(moneyLog);
+    }
+
+    private static LocalDateTime parseDate(String date) {
+        try {
+            return LocalDate.parse(date).atStartOfDay();
+        } catch (DateTimeParseException e) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "날짜 형식이 올바르지 않습니다. (yyyy-MM-dd)"
+            );
+        }
+    }
+
+    private static CategoryType parseType(String type) {
+        try {
+            return CategoryType.valueOf(type);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "유형은 INCOME 또는 EXPENSE여야 합니다."
+            );
+        }
     }
 
     public MoneyLogResponse getLog(Long id, String email) {
@@ -97,7 +119,9 @@ public class MoneyLogService {
                 request.title(),
                 request.description(),
                 request.money(),
-                category
+                category,
+                parseType(request.type()),
+                parseDate(request.date())
         );
 
         return MoneyLogResponse.from(log);

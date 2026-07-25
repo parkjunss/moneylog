@@ -49,13 +49,16 @@ public class MoneyLog {
             String title,
             String description,
             Long money,
-            Category category
+            Category category,
+            CategoryType type,
+            LocalDateTime createdAt
     ) {
         this.title = title;
         this.description = description;
         this.money = money;
         this.category = category;
-        this.type = category.getType();
+        this.type = type;
+        this.createdAt = createdAt;
     }
 
 }
