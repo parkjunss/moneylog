@@ -2,6 +2,7 @@ package org.juns.moneylog.config.enums;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.juns.moneylog.config.exception.CategoryNotSupportedException;
 
 import java.util.Arrays;
 
@@ -38,6 +39,6 @@ public enum CategoryName {
         return Arrays.stream(values())
                 .filter(t -> t.displayName.equalsIgnoreCase(value))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("일치하는 Enum 객체가 없습니다: " + value));
+                .orElseThrow(() -> new CategoryNotSupportedException("일치하는 Enum 객체가 없습니다: " + value));
     }
 }
