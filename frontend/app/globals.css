@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f8f9fc;
+  --foreground: #171717;
+  --surface: #ffffff;
+  --border: #e5e7eb;
+  --muted: #6b7280;
+
+  --brand-start: #6366f1;
+  --brand-end: #8b5cf6;
+  --brand: #4f46e5;
+  --brand-soft: #eef2ff;
+
+  --income: #10b981;
+  --income-soft: #d1fae5;
+  --expense: #f43f5e;
+  --expense-soft: #ffe4e6;
+  --balance: #4f46e5;
+  --balance-soft: #e0e7ff;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+
+  --color-brand-start: var(--brand-start);
+  --color-brand-end: var(--brand-end);
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+
+  --color-income: var(--income);
+  --color-income-soft: var(--income-soft);
+  --color-expense: var(--expense);
+  --color-expense-soft: var(--expense-soft);
+  --color-balance: var(--balance);
+  --color-balance-soft: var(--balance-soft);
+
+  --font-sans: var(--font-noto-sans-kr);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}

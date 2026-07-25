@@ -24,7 +24,7 @@ public class CategoryController {
     }
 
     @PostMapping
-    public ResponseEntity<CategoryResponse> getCategory(Authentication authentication, @Valid @RequestBody CategoryRequest categoryRequest) {
+    public ResponseEntity<CategoryResponse> addCategory(Authentication authentication, @Valid @RequestBody CategoryRequest categoryRequest) {
         String email = authentication.getName();
         CategoryResponse categoryResponse = categoryService.addCategory(categoryRequest, email);
         return ResponseEntity.ok(categoryResponse);
@@ -39,7 +39,7 @@ public class CategoryController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> updateCategory(@PathVariable Long id, Authentication authentication) {
+    public ResponseEntity<Void> deleteCategory(@PathVariable Long id, Authentication authentication) {
         String email = authentication.getName();
         categoryService.deleteCategory(id, email);
         return ResponseEntity.noContent().build();

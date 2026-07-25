@@ -68,7 +68,7 @@ class MoneyLogServiceTest {
                 .category(oldCategory)
                 .build();
         MoneylogUpdateRequest request =
-                new MoneylogUpdateRequest("월급", "7월 급여", 3_000_000L, "2026-07-24", "SALARY");
+                new MoneylogUpdateRequest("월급", "7월 급여", 3_000_000L, "2026-07-24", "SALARY", "INCOME");
 
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
         when(moneyLogRepository.findByIdAndCreatedBy(1L, user)).thenReturn(Optional.ofNullable(log));
@@ -90,7 +90,7 @@ class MoneyLogServiceTest {
         String email = "user@example.com";
         User user = User.builder().email(email).username("juns").build();
         MoneylogUpdateRequest request =
-                new MoneylogUpdateRequest( "제목", "설명", 1_000L, "2026-07-24", "UNKNOWN");
+                new MoneylogUpdateRequest("제목", "설명", 1_000L, "2026-07-24", "UNKNOWN", "EXPENSE");
 
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
         when(moneyLogRepository.findByIdAndCreatedBy(1L, user)).thenReturn(Optional.ofNullable(MoneyLog.builder().build()));

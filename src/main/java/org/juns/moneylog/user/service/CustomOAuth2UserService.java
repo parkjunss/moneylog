@@ -28,6 +28,8 @@ import java.util.Set;
 public class CustomOAuth2UserService
         extends DefaultOAuth2UserService {
 
+    private static final int MAX_USERNAME_LENGTH = 50;
+
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final OAuthAccountRepository oAuthAccountRepository;
@@ -52,6 +54,7 @@ public class CustomOAuth2UserService
         String email = required(principal, "email")
                 .trim()
                 .toLowerCase(Locale.ROOT);
+        String displayName = principal.getAttribute("name");
 
         oAuthAccountRepository
                 .findByProviderAndProviderUserId(
@@ -59,7 +62,7 @@ public class CustomOAuth2UserService
                         providerUserId
                 )
                 .orElseGet(() ->
-                        createAccount(providerUserId, email)
+                        createAccount(providerUserId, email, displayName)
                 );
 
         return principal;
@@ -67,7 +70,7 @@ public class CustomOAuth2UserService
 
     public User requireUser(OAuth2User principal) {
         return oAuthAccountRepository
-                .findByProviderAndProviderUserId(
+                .findWithUserByProviderAndProviderUserId(
                         Provider.GOOGLE,
                         required(principal, "sub")
                 )
@@ -82,7 +85,8 @@ public class CustomOAuth2UserService
 
     private OAuthAccount createAccount(
             String providerUserId,
-            String email
+            String email,
+            String displayName
     ) {
         if (userRepository.existsByEmail(email)) {
             throw oauthError(
@@ -106,14 +110,7 @@ public class CustomOAuth2UserService
         User user = userRepository.save(
                 User.builder()
                         .email(email)
-                        .username(
-                                "google_" + providerUserId.substring(
-                                        Math.max(
-                                                0,
-                                                providerUserId.length() - 43
-                                        )
-                                )
-                        )
+                        .username(generateUniqueUsername(displayName, providerUserId))
                         .roles(roles)
                         .build()
         );
@@ -125,6 +122,34 @@ public class CustomOAuth2UserService
                         .providerUserId(providerUserId)
                         .build()
         );
+    }
+
+    private String generateUniqueUsername(String displayName, String providerUserId) {
+        String base = baseUsername(displayName, providerUserId);
+        String candidate = base;
+        int suffix = 1;
+
+        while (userRepository.findByUsername(candidate).isPresent()) {
+            String suffixText = String.valueOf(suffix++);
+            int allowedBaseLength = MAX_USERNAME_LENGTH - suffixText.length();
+            candidate = base.substring(0, Math.min(base.length(), allowedBaseLength)) + suffixText;
+        }
+
+        return candidate;
+    }
+
+    private static String baseUsername(String displayName, String providerUserId) {
+        if (displayName != null && !displayName.isBlank()) {
+            String trimmed = displayName.trim();
+            return trimmed.length() > MAX_USERNAME_LENGTH
+                    ? trimmed.substring(0, MAX_USERNAME_LENGTH)
+                    : trimmed;
+        }
+
+        String shortSuffix = providerUserId.substring(
+                Math.max(0, providerUserId.length() - 8)
+        );
+        return "google_" + shortSuffix;
     }
 
     private static String required(
