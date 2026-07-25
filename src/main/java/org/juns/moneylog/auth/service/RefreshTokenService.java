@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.juns.moneylog.auth.domain.RefreshToken;
 import org.juns.moneylog.auth.dto.RotatedToken;
 import org.juns.moneylog.auth.repository.RefreshTokenRepository;
+import org.juns.moneylog.config.exception.AuthenticationFailedException;
 import org.juns.moneylog.user.domain.User;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -17,8 +18,6 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.HexFormat;
-import java.util.Random;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -39,7 +38,6 @@ public class RefreshTokenService {
 
     private static String generate() {
         byte[] bytes = new byte[32];
-        Random random = new Random();
         random.nextBytes(bytes);
 
         return Base64.getUrlEncoder()
@@ -68,17 +66,17 @@ public class RefreshTokenService {
 
     @Transactional
     public String issueRefreshToken(User user) {
-        String rawToken = UUID.randomUUID().toString();
-        String refreshToken = generate();
+        String rawToken = generate();
+        String tokenHash = hash(rawToken);
         LocalDateTime expiresAt = expiresAt();
 
         refreshTokenRepository.findByUserId(user.getId())
                 .ifPresentOrElse(
-                    saved -> saved.update(refreshToken, expiresAt),
+                    saved -> saved.update(tokenHash, expiresAt),
                         () -> refreshTokenRepository.save(
                                 RefreshToken.builder()
                                         .user(user)
-                                        .token(refreshToken)
+                                        .token(tokenHash)
                                         .expiresAt(expiresAt)
                                         .build()
                         )
@@ -90,11 +88,12 @@ public class RefreshTokenService {
     @Transactional
     public RotatedToken rotateRefreshToken(String refreshToken) {
 
-        RefreshToken saved = refreshTokenRepository.findByToken(hash(refreshToken)).orElseThrow(() -> new IllegalArgumentException("Invalid refresh token"));
+        RefreshToken saved = refreshTokenRepository.findByToken(hash(refreshToken))
+                .orElseThrow(() -> new AuthenticationFailedException("유효하지 않은 refresh token입니다."));
 
         if (saved.isExpired()) {
             refreshTokenRepository.delete(saved);
-            throw new IllegalStateException("Refresh token expired");
+            throw new AuthenticationFailedException("만료된 refresh token입니다.");
         }
 
         String nextRefreshToken = generate();

@@ -1,5 +1,6 @@
 package org.juns.moneylog.config.handler;
 
+import org.juns.moneylog.config.exception.AuthenticationFailedException;
 import org.juns.moneylog.config.exception.CategoryNotFoundException;
 import org.juns.moneylog.config.exception.CategoryNotSupportedException;
 import org.juns.moneylog.config.exception.UserNotFoundException;
@@ -43,5 +44,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errors);
     }
 
+    @ExceptionHandler(AuthenticationFailedException.class)
+    public ResponseEntity<Map<String, String>> handleAuthenticationFailedException(AuthenticationFailedException exception) {
+        Map<String, String> errors = new HashMap<>();
+        errors.put("message", exception.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errors);
+    }
 
 }

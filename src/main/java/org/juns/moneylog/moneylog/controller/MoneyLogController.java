@@ -1,5 +1,6 @@
 package org.juns.moneylog.moneylog.controller;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
@@ -40,7 +41,7 @@ public class MoneyLogController {
     }
 
     @PostMapping
-    public ResponseEntity<MoneyLogResponse> addMoneyLog(@RequestBody MoneyLogRequest moneyLogRequest, Authentication authentication) {
+    public ResponseEntity<MoneyLogResponse> addMoneyLog(@Valid @RequestBody MoneyLogRequest moneyLogRequest, Authentication authentication) {
         String email = authentication.getName();
         MoneyLogResponse response = moneyLogService.createLog(moneyLogRequest, email);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -53,7 +54,7 @@ public class MoneyLogController {
     }
 
     @PatchMapping("/{id}")
-    public ResponseEntity<MoneyLogResponse> updateMoneyLog(@PathVariable Long id, @RequestBody MoneylogUpdateRequest updateRequest, Authentication authentication) {
+    public ResponseEntity<MoneyLogResponse> updateMoneyLog(@PathVariable Long id, @Valid @RequestBody MoneylogUpdateRequest updateRequest, Authentication authentication) {
         String email = authentication.getName();
         MoneyLogResponse response = moneyLogService.updateLog(id, updateRequest, email);
         return ResponseEntity.ok(response);
