@@ -5,9 +5,12 @@ import org.juns.moneylog.config.enums.CategoryType;
 import org.juns.moneylog.moneylog.domain.MoneyLog;
 import org.juns.moneylog.moneylog.dto.CategoryExpenseProjection;
 import org.juns.moneylog.user.domain.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.security.core.parameters.P;
 
 import java.time.LocalDateTime;
 import java.time.Month;
@@ -62,5 +65,25 @@ public interface MoneyLogRepository extends JpaRepository<MoneyLog, Long> {
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end
     );
+
+
+    @Query("""
+        select m
+        from MoneyLog m
+        where m.createdBy = :user
+            and (:type is null or m.type = :type)
+            and (:year is null or year(m.createdAt) = :year)
+            and (:month is null or month(m.createdAt) = :month)
+            and (:categoryId is null or m.category.id = :categoryId)
+    """)
+    Page<MoneyLog> searchMoneyLog(
+            @Param("user") User user,
+            @Param("year") Integer year,
+            @Param("month") Integer month,
+            @Param("type") CategoryType type,
+            @Param("categoryId") Long categoryId,
+            Pageable pageable
+    );
+
 
 }

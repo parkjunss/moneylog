@@ -10,6 +10,8 @@ import org.juns.moneylog.moneylog.dto.*;
 import org.juns.moneylog.moneylog.repository.MoneyLogRepository;
 import org.juns.moneylog.user.domain.User;
 import org.juns.moneylog.user.repository.UserRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
@@ -18,6 +20,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.net.http.HttpResponse;
 import java.time.LocalDateTime;
+import java.time.Month;
+import java.time.Year;
 import java.time.YearMonth;
 import java.util.Comparator;
 import java.util.List;
@@ -58,12 +62,6 @@ public class MoneyLogService {
         return MoneyLogResponse.from(moneyLog);
     }
 
-
-    public List<MoneyLogResponse> getAllLogs(String email) {
-        User user = userRepository.findByEmail(email).orElseThrow(() -> new IllegalArgumentException(email));
-        List<MoneyLog> logs = moneyLogRepository.findByCreatedBy(user);
-        return logs.stream().map(MoneyLogResponse::from).toList();
-    }
 
     @Transactional
     public MoneyLogResponse updateLog(Long id, MoneylogUpdateRequest request, String email) {
@@ -177,6 +175,21 @@ public class MoneyLogService {
                 .balance(totalIncome - totalExpense)
                 .categoryExpenses(categoryExpenses)
                 .build();
+    }
+
+
+    public Page<MoneyLogResponse> getMoneyLogs(
+            String email,
+            Integer year,
+            Integer month,
+            CategoryType categoryType,
+            Long categoryId,
+            Pageable pageable
+    ){
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new UsernameNotFoundException(email));
+        return moneyLogRepository
+                .searchMoneyLog(user, year, month, categoryType, categoryId, pageable)
+                .map(MoneyLogResponse::from);
     }
 
 }

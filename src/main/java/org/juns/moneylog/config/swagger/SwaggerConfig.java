@@ -23,8 +23,8 @@ public class SwaggerConfig {
 
     @Bean
     public GroupedOpenApi customGroupedOpenAPI() {
-        String[] paths = { "/api/vi/**" };
-        String[] packagesToScan = { "com.example.spingdoc" };
+        String[] paths = { "/api/**" };
+        String[] packagesToScan = { "org.juns.moneylog" };
         return GroupedOpenApi.builder()
                 .group("Money Log")
                 .pathsToMatch(paths)

@@ -2,6 +2,7 @@ package org.juns.moneylog.user.service;
 
 import lombok.RequiredArgsConstructor;
 import org.juns.moneylog.config.enums.RoleType;
+import org.juns.moneylog.config.exception.UserNotFoundException;
 import org.juns.moneylog.user.domain.Role;
 import org.juns.moneylog.user.domain.User;
 import org.juns.moneylog.user.dto.UserCreateRequest;
@@ -50,25 +51,27 @@ public class UserService {
                 .roles(roles)
                 .build();
 
+        userRepository.save(newUser);
+
         return UserResponse.from(newUser);
     }
 
     @Transactional
     public void deleteUser(String email) {
-        User user = userRepository.findByEmail(email).orElseThrow(() -> new IllegalArgumentException("User not found"));
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new UserNotFoundException("User not found"));
         userRepository.delete(user);
     }
 
     @Transactional
     public void updateUser(String email, UserUpdateRequest userUpdateRequest) {
-        User user = userRepository.findByEmail(email).orElseThrow(() -> new IllegalArgumentException("User not found"));
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new UserNotFoundException("User not found"));
         user.updateUsername(userUpdateRequest.username());
         UserResponse.from(user);
     }
 
 
     public UserResponse getUserByEmail(String email) {
-        User user = userRepository.findByEmail(email).orElseThrow(() -> new IllegalArgumentException("User not found"));
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new UserNotFoundException("User not found"));
         return UserResponse.from(user);
     }
 
