@@ -9,6 +9,7 @@ import org.juns.moneylog.user.domain.Role;
 import org.juns.moneylog.user.domain.User;
 import org.juns.moneylog.user.repository.RoleRepository;
 import org.juns.moneylog.user.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -27,6 +28,15 @@ public class MyInitialDataService {
     private final PasswordEncoder passwordEncoder;
 
     private final CategoryRepository categoryRepository;
+
+    @Value("${app.admin.email}")
+    private String adminEmail;
+
+    @Value("${app.admin.password}")
+    private String adminPassword;
+
+    @Value("${app.admin.username}")
+    private String adminUsername;
 
     @Bean
     public ApplicationRunner myInitializeData() {
@@ -49,8 +59,6 @@ public class MyInitialDataService {
                                 .build()
                 ));
 
-        String adminEmail = "admin@moneylog.com";
-
         for (CategoryName categoryName : CategoryName.values()) {
             if (!categoryRepository.existsByCategoryName(categoryName)) {
                 categoryRepository.save(
@@ -69,8 +77,8 @@ public class MyInitialDataService {
 
             User admin = User.builder()
                     .email(adminEmail)
-                    .passwordHash(passwordEncoder.encode("admin1234!"))
-                    .username("관리자")
+                    .passwordHash(passwordEncoder.encode(adminPassword))
+                    .username(adminUsername)
                     .roles(roles)
                     .build();
 
