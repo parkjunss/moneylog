@@ -97,3 +97,122 @@
 
 ### 프로세스
 - 이번 프로젝트에서 배운 가장 큰 교훈은 **"컴파일되고 화면에 나온다"와 "실제로 정확하게 동작한다"는 다르다**는 것이다. no-op 버그(수정/삭제가 아무 일도 안 함), 부호가 뒤집힌 계산, 트랜잭션 경계를 넘어서는 지연 로딩 접근은 전부 겉보기엔 정상이었다. 다음부터는 기능을 만들 때마다 실제 API를 호출해 응답을 눈으로 확인하는 걸 습관화해야겠다.
+
+---
+
+## Raspberry Pi 배포 회고
+
+### 목표와 최종 구조
+
+`main` push를 기준으로 GitHub Actions가 ARM64 이미지를 GHCR에 빌드하고, Raspberry Pi의 self-hosted runner가 k3s에 배포하도록 구성했다. 외부 HTTPS는 Pi에서 이미 운영 중인 Nginx가 도메인별로 라우팅한다.
+
+```text
+GitHub main push
+  → GitHub-hosted runner가 linux/arm64 이미지 빌드
+  → GHCR에 backend/frontend 이미지 push
+  → Raspberry Pi self-hosted runner가 kubectl 실행
+  → k3s의 MySQL, backend, frontend 갱신
+
+Internet :80/:443
+  → 기존 marketboard-nginx
+  → Host: devvault.duckdns.org     → DevVault
+  → Host: marketboard.duckdns.org  → MarketBoard
+  → Host: junmoneylog.duckdns.org
+       ├─ /api, /oauth2, /login/oauth2 → MoneyLog backend NodePort 30081
+       └─ 나머지 경로                   → MoneyLog frontend NodePort 30080
+```
+
+### 발생한 문제와 해결
+
+| 단계 | 증상 | 근본 원인 | 최종 해결 |
+|---|---|---|---|
+| k3s 시작 | 서비스가 계속 `activating` | Raspberry Pi 커널에서 memory cgroup v2가 비활성화됨 | 부팅 옵션에 `cgroup_enable=memory cgroup_memory=1`을 추가하고 재부팅 |
+| k3s 인증 | `kubectl`이 자격 증명을 요구하고 kubeconfig가 없음 | k3s가 초기화 전에 종료되어 kubeconfig를 생성하지 못함 | memory cgroup 문제를 먼저 해결한 뒤 생성된 kubeconfig 사용 |
+| Runner 서비스 | `status=200/CHDIR`로 실패 | Runner 파일은 `/home/jun` 아래 있는데 별도 `github-runner` 사용자로 실행 | 개인 Pi에서는 기존 `jun` 계정으로 서비스 실행 |
+| 서비스 재등록 | `svc.sh uninstall` 후에도 unit이 남음 | `systemctl status` pager에서 `Ctrl+C`로 스크립트까지 중단 | `SYSTEMD_PAGER=cat PAGER=cat`으로 pager 없이 제거 |
+| Runner의 kubectl | Actions에서 kubeconfig permission denied | `k3s` 그룹 권한이 실행 중인 Runner에 반영되지 않음 | kubeconfig를 `root:k3s 0640`으로 설정하고 Runner 재시작 |
+| Docker 빌드 | GitHub ARM64 빌드에서 `./gradlew: Permission denied` | Windows에서 커밋된 `gradlew` 모드가 `100644` | Dockerfile에서 `chmod +x gradlew` 후 실행 |
+| 외부 포트 | 80/443 포워딩 규칙이 기존 항목과 충돌 | 같은 공인 IP의 80/443을 기존 Nginx가 이미 사용 | 포워딩을 바꾸지 않고 Nginx `server_name`으로 도메인 분기 |
+| k3s Ingress | cert-manager HTTP-01 challenge가 404 | 기존 Nginx를 확인하기 전에 Traefik이 외부 진입점이라고 가정 | k3s Ingress/cert-manager를 제거하고 기존 Nginx에서 TLS 종료 |
+| Certbot | `certonly`을 전달했지만 기존 인증서 `renew`만 실행 | Compose certbot 서비스의 고정 entrypoint가 우선 | `--entrypoint certbot`으로 신규 발급 명령을 명시 |
+
+### 잘못된 판단
+
+1. 기존 80/443 리스너와 Nginx virtual host를 확인하기 전에 k3s Traefik을 외부 진입점으로 가정했다.
+2. 개인 Pi에 불필요한 Runner 사용자 분리를 적용해 경로와 권한 문제를 늘렸다.
+3. 컨테이너 이름, 컨테이너 내부 명령, Compose 서비스명, 명령 실행 디렉터리를 명확하게 구분하지 않았다.
+4. 한 단계의 성공 조건을 확인하기 전에 다음 단계로 넘어갔다.
+
+### 다음에 적용할 순서
+
+1. `ss -lntp`, `docker ps`, 기존 Nginx 설정으로 80/443의 실제 소유자를 확인한다.
+2. k3s의 `active`, 노드 `Ready`, memory cgroup을 검증한다.
+3. 현재 사용자로 Runner를 서비스화하고 동일 사용자로 `kubectl get nodes`를 실행한다.
+4. Repository Secrets와 Variables를 등록한다.
+5. Docker 이미지를 Linux 환경에서 실제 빌드해 wrapper 권한을 확인한다.
+6. Actions build 성공 후 deploy job과 Pod rollout을 확인한다.
+7. 기존 Nginx에 HTTP 전용 `server_name` 블록을 먼저 추가한다.
+8. Certbot webroot 방식으로 인증서를 발급한다.
+9. HTTPS 블록을 적용하고 HTTP, HTTPS, API, Google OAuth를 각각 검증한다.
+
+### 재사용할 점검 명령
+
+```bash
+# Pi와 k3s
+uname -m
+sudo systemctl is-active k3s
+kubectl get nodes
+
+# 외부 진입점
+sudo ss -lntp | grep -E ':(80|443)\s'
+docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Ports}}'
+
+# Runner
+sudo systemctl show actions.runner.parkjunss-moneylog.rasp4.service \
+  -p User -p WorkingDirectory -p ActiveState
+
+# MoneyLog
+kubectl -n moneylog get deployments,pods,services,pvc
+curl http://127.0.0.1:30081/actuator/health
+curl -I http://127.0.0.1:30080
+
+# Nginx
+docker exec marketboard-nginx nginx -t
+docker exec marketboard-nginx nginx -s reload
+```
+
+### Certbot 신규 발급 명령
+
+MarketBoard Compose 프로젝트 디렉터리에서 실행한다.
+
+```bash
+docker compose run --rm \
+  --entrypoint certbot \
+  certbot certonly \
+  --webroot \
+  --webroot-path=/var/www/certbot \
+  --email wnstjd117@gmail.com \
+  --agree-tos \
+  --no-eff-email \
+  -d junmoneylog.duckdns.org
+```
+
+### 검증 경계
+
+완료:
+
+- k3s 노드 `Ready`
+- GitHub self-hosted runner 연결 및 서비스 실행
+- Runner의 k3s 접근 권한 확보
+- Gradle wrapper 권한 문제 해결
+- GitHub Actions에서 k3s로 이어지는 배포 경로 구성
+- 기존 Nginx를 사용하는 최종 네트워크 구조 확정
+- `junmoneylog.duckdns.org` 인증서 신규 발급
+
+남음:
+
+- 최종 `junmoneylog.conf`의 `nginx -t` 통과
+- Nginx reload 후 HTTP → HTTPS 리다이렉트 확인
+- HTTPS 프론트엔드와 `/api` 백엔드 응답 확인
+- 실제 Google OAuth 브라우저 로그인 확인
+- Certbot 자동 갱신 후 Nginx reload 확인
