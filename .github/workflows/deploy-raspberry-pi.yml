@@ -1,0 +1,112 @@
+name: Deploy to Raspberry Pi
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      backend-image: ${{ steps.image.outputs.backend }}
+      frontend-image: ${{ steps.image.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: image
+        shell: bash
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "backend=${REGISTRY}/${owner}/moneylog-backend:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "frontend=${REGISTRY}/${owner}/moneylog-frontend:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "backend_latest=${REGISTRY}/${owner}/moneylog-backend:latest" >> "$GITHUB_OUTPUT"
+          echo "frontend_latest=${REGISTRY}/${owner}/moneylog-frontend:latest" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ${{ steps.image.outputs.backend }}
+            ${{ steps.image.outputs.backend_latest }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          platforms: linux/arm64
+          push: true
+          build-args: |
+            NEXT_PUBLIC_API_BASE_URL=${{ vars.PUBLIC_API_BASE_URL || 'http://raspberrypi.local:30081' }}
+          tags: |
+            ${{ steps.image.outputs.frontend }}
+            ${{ steps.image.outputs.frontend_latest }}
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+  deploy:
+    needs: build
+    runs-on: [self-hosted, linux, ARM64]
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create namespace and secrets
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          FRONTEND_URL: ${{ vars.FRONTEND_URL || 'http://raspberrypi.local:30080' }}
+        run: |
+          kubectl create namespace moneylog --dry-run=client -o yaml | kubectl apply -f -
+          kubectl -n moneylog create secret docker-registry ghcr \
+            --docker-server=ghcr.io \
+            --docker-username="${{ github.actor }}" \
+            --docker-password="$GHCR_TOKEN" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          kubectl -n moneylog create secret generic moneylog-secrets \
+            --from-literal=MYSQL_PASSWORD="$MYSQL_PASSWORD" \
+            --from-literal=MYSQL_ROOT_PASSWORD="$MYSQL_ROOT_PASSWORD" \
+            --from-literal=GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" \
+            --from-literal=GOOGLE_CLIENT_SECRET="$GOOGLE_CLIENT_SECRET" \
+            --from-literal=JWT_SECRET="$JWT_SECRET" \
+            --from-literal=ADMIN_EMAIL="$ADMIN_EMAIL" \
+            --from-literal=ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+            --from-literal=FRONTEND_URL="$FRONTEND_URL" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy
+        run: |
+          kubectl apply -f k8s/moneylog.yaml
+          kubectl -n moneylog set image deployment/backend backend="${{ needs.build.outputs.backend-image }}"
+          kubectl -n moneylog set image deployment/frontend frontend="${{ needs.build.outputs.frontend-image }}"
+          kubectl -n moneylog rollout status deployment/mysql --timeout=5m
+          kubectl -n moneylog rollout status deployment/backend --timeout=5m
+          kubectl -n moneylog rollout status deployment/frontend --timeout=5m
