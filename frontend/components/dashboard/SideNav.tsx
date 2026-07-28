@@ -1,19 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { navItems } from "@/lib/nav-items";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function SideNav() {
   const pathname = usePathname();
-  const router = useRouter();
   const { logout } = useAuth();
 
   async function handleLogout() {
     await logout();
-    router.replace("/login");
+    // 로그인 페이지의 "이미 인증됨" 가드가 아직 갱신 전인 context 상태를 읽고
+    // 대시보드로 되튕기는 race를 피하기 위해 완전한 페이지 이동을 사용한다.
+    window.location.href = "/login";
   }
 
   return (
