@@ -82,6 +82,46 @@ export class ApiError extends Error {
   }
 }
 
+let accessTokenHandler: (accessToken: string | null) => void = () => {};
+let reissuePromise: Promise<AuthTokenResponse | null> | null = null;
+
+export function setAccessTokenHandler(
+  handler: (accessToken: string | null) => void
+): () => void {
+  accessTokenHandler = handler;
+  return () => {
+    if (accessTokenHandler === handler) accessTokenHandler = () => {};
+  };
+}
+
+async function authenticatedFetch(
+  url: string,
+  accessToken: string,
+  init: RequestInit = {}
+): Promise<Response> {
+  const request = (token: string) => {
+    const headers = new Headers(init.headers);
+    headers.set("Authorization", `Bearer ${token}`);
+    return fetch(url, { ...init, headers });
+  };
+
+  const response = await request(accessToken);
+  if (response.status !== 401) return response;
+
+  reissuePromise ??= apiReissue().finally(() => {
+    reissuePromise = null;
+  });
+  const tokens = await reissuePromise;
+
+  if (!tokens?.accessToken) {
+    accessTokenHandler(null);
+    return response;
+  }
+
+  accessTokenHandler(tokens.accessToken);
+  return request(tokens.accessToken);
+}
+
 async function parseErrorMessage(response: Response): Promise<string> {
   try {
     const data: unknown = await response.json();
@@ -163,9 +203,10 @@ export async function apiLogout(): Promise<void> {
 }
 
 export async function apiGetProfile(accessToken: string): Promise<UserProfile> {
-  const response = await fetch(`${API_BASE_URL}/api/users/profile`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  const response = await authenticatedFetch(
+    `${API_BASE_URL}/api/users/profile`,
+    accessToken
+  );
 
   if (!response.ok) {
     throw new ApiError(response.status, await parseErrorMessage(response));
@@ -184,9 +225,10 @@ export async function apiGetMonthlyStatistics(
   month: number
 ): Promise<MonthlyStatistics> {
   const params = new URLSearchParams({ year: String(year), month: String(month) });
-  const response = await fetch(`${API_BASE_URL}/api/money-logs/monthly?${params}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  const response = await authenticatedFetch(
+    `${API_BASE_URL}/api/money-logs/monthly?${params}`,
+    accessToken
+  );
 
   if (!response.ok) {
     throw new ApiError(response.status, await parseErrorMessage(response));
@@ -214,9 +256,10 @@ export async function apiGetMoneyLogs(
   params.set("page", String(filter.page ?? 0));
   params.set("size", String(filter.size ?? 10));
 
-  const response = await fetch(`${API_BASE_URL}/api/money-logs?${params}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  const response = await authenticatedFetch(
+    `${API_BASE_URL}/api/money-logs?${params}`,
+    accessToken
+  );
 
   if (!response.ok) {
     throw new ApiError(response.status, await parseErrorMessage(response));
@@ -229,14 +272,15 @@ export async function apiCreateMoneyLog(
   accessToken: string,
   input: MoneyLogInput
 ): Promise<MoneyLogItem> {
-  const response = await fetch(`${API_BASE_URL}/api/money-logs`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify(input),
-  });
+  const response = await authenticatedFetch(
+    `${API_BASE_URL}/api/money-logs`,
+    accessToken,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }
+  );
 
   if (!response.ok) {
     throw new ApiError(response.status, await parseErrorMessage(response));
@@ -250,14 +294,15 @@ export async function apiUpdateMoneyLog(
   id: number,
   input: MoneyLogInput
 ): Promise<MoneyLogItem> {
-  const response = await fetch(`${API_BASE_URL}/api/money-logs/${id}`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify(input),
-  });
+  const response = await authenticatedFetch(
+    `${API_BASE_URL}/api/money-logs/${id}`,
+    accessToken,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }
+  );
 
   if (!response.ok) {
     throw new ApiError(response.status, await parseErrorMessage(response));
@@ -267,10 +312,11 @@ export async function apiUpdateMoneyLog(
 }
 
 export async function apiDeleteMoneyLog(accessToken: string, id: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/money-logs/${id}`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  const response = await authenticatedFetch(
+    `${API_BASE_URL}/api/money-logs/${id}`,
+    accessToken,
+    { method: "DELETE" }
+  );
 
   if (!response.ok) {
     throw new ApiError(response.status, await parseErrorMessage(response));
@@ -291,14 +337,15 @@ export async function apiCreateCategory(
   accessToken: string,
   input: CategoryInput
 ): Promise<CategoryItem> {
-  const response = await fetch(`${API_BASE_URL}/api/category`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify(input),
-  });
+  const response = await authenticatedFetch(
+    `${API_BASE_URL}/api/category`,
+    accessToken,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }
+  );
 
   if (!response.ok) {
     throw new ApiError(response.status, await parseErrorMessage(response));
@@ -308,10 +355,11 @@ export async function apiCreateCategory(
 }
 
 export async function apiDeleteCategory(accessToken: string, id: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/category/${id}`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  const response = await authenticatedFetch(
+    `${API_BASE_URL}/api/category/${id}`,
+    accessToken,
+    { method: "DELETE" }
+  );
 
   if (!response.ok) {
     throw new ApiError(response.status, await parseErrorMessage(response));

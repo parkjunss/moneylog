@@ -28,7 +28,7 @@ public class SecurityConfig {
             HttpSecurity http,
             OAuth2LoginHandler oAuth2LoginHandler,
             CustomOAuth2UserService customOAuth2UserService
-    ) throws Exception {
+    ) {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
@@ -48,6 +48,11 @@ public class SecurityConfig {
                         ).permitAll()
                         .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
                         .requestMatchers("/actuator/health/**").permitAll()
+                        .requestMatchers(
+                                "/swagger-ui-custom.html",
+                                "/swagger-ui/**",
+                                "/api-docs/**"
+                        ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/category/**").permitAll()
                         .anyRequest().authenticated()
                 )
@@ -64,8 +69,6 @@ public class SecurityConfig {
                                 .jwtAuthenticationConverter(jwtAuthenticationConverter())
                         )
                 );
-        ;
-
         return http.build();
     }
 

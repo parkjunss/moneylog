@@ -12,6 +12,7 @@ import {
   apiLogin,
   apiLogout,
   apiReissue,
+  setAccessTokenHandler,
   type UserProfile,
 } from "@/lib/api-client";
 import { decodeJwtRoles } from "@/lib/jwt";
@@ -38,6 +39,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const profile = await apiGetProfile(token);
     setUser(profile);
   }, []);
+
+  useEffect(
+    () =>
+      setAccessTokenHandler((token) => {
+        setAccessToken(token);
+        if (!token) setUser(null);
+      }),
+    []
+  );
 
   // 새로고침/최초 진입 시 httpOnly refresh token 쿠키로 세션을 복구한다.
   useEffect(() => {
