@@ -98,7 +98,7 @@ docker compose down
 | 월별 통계 | GET | `/api/money-logs/monthly` |
 | 카테고리 목록 | GET | `/api/category/all` |
 
-전체 요청·응답 형식은 [ERD 및 API 설계](docs/ERD-API설계.md) 또는 Swagger UI에서 확인할 수 있습니다.
+전체 요청·응답 형식은 [ERD 및 API 설계](docs/ERD-API설계.md) 또는 Swagger UI(https://junmoneylog.duckdns.org/swagger-ui/index.html)에서 확인할 수 있습니다.
 
 ## 🗄️ ERD
 
