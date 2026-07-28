@@ -26,7 +26,7 @@ public class SwaggerConfig {
         String[] paths = { "/api/**" };
         String[] packagesToScan = { "org.juns.moneylog" };
         return GroupedOpenApi.builder()
-                .group("Money Log")
+                .group("money-log")
                 .pathsToMatch(paths)
                 .packagesToScan(packagesToScan)
                 .build();
